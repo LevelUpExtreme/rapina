@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{ItemFn, LitStr, parse_macro_input};
+use syn::{FnArg, ItemFn, LitStr, Pat, parse_macro_input};
 
 #[proc_macro_attribute]
 pub fn get(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -31,11 +31,44 @@ fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
     let func_output = &func.sig.output;
     let func_vis = &func.vis;
 
-    let expanded = quote! {
-        #func_vis async fn #func_name(
-            _req: hyper::Request<hyper::body::Incoming>,
-            _params: rapina::extract::PathParams,
-        ) #func_output #func_block
+    let args: Vec<_> = func.sig.inputs.iter().collect();
+
+    let expanded = if args.is_empty() {
+        quote! {
+            #func_vis async fn #func_name(
+                _req: hyper::Request<hyper::body::Incoming>,
+                _params: rapina::extract::PathParams,
+            ) #func_output #func_block
+        }
+    } else {
+        let mut extractions = Vec::new();
+        let mut arg_names = Vec::new();
+
+        for arg in &args {
+            if let FnArg::Typed(pat_type) = arg {
+                if let Pat::Ident(pat_ident) = &*pat_type.pat {
+                    let arg_name = &pat_ident.ident;
+                    let arg_type = &pat_type.ty;
+
+                    arg_names.push(arg_name.clone());
+                    extractions.push(quote! {
+                        let #arg_name = <#arg_type as rapina::extract::FromRequest>::from_request(req, &params).await.unwrap();
+                    });
+                }
+            }
+        }
+
+        let inner_block = &func.block;
+
+        quote! {
+            #func_vis async fn #func_name(
+                req: hyper::Request<hyper::body::Incoming>,
+                params: rapina::extract::PathParams,
+            ) #func_output {
+                #(#extractions)*
+                #inner_block
+            }
+        }
     };
 
     TokenStream::from(expanded)

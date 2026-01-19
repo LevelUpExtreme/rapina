@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use http::Request;
 use http_body_util::BodyExt;
+use hyper::body::Incoming;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
@@ -11,14 +12,21 @@ pub struct Json<T>(pub T);
 
 pub type PathParams = HashMap<String, String>;
 
+pub trait FromRequest: Sized {
+    fn from_request(
+        req: Request<Incoming>,
+        params: &PathParams,
+    ) -> impl std::future::Future<Output = Result<Self, Error>> + Send;
+}
+
 impl<T> Json<T> {
     pub fn into_inner(self) -> T {
         self.0
     }
 }
 
-impl<T: DeserializeOwned> Json<T> {
-    pub async fn from_request(req: Request<hyper::body::Incoming>) -> Result<Self, Error> {
+impl<T: DeserializeOwned + Send> FromRequest for Json<T> {
+    async fn from_request(req: Request<Incoming>, _params: &PathParams) -> Result<Self, Error> {
         let body = req.into_body();
         let bytes = body
             .collect()
