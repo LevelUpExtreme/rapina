@@ -1,5 +1,7 @@
+mod body_limit;
 mod timeout;
 
+pub use body_limit::BodyLimitMiddleware;
 pub use timeout::TimeoutMiddleware;
 
 use std::future::Future;
