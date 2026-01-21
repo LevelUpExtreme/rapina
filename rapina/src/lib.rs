@@ -3,6 +3,7 @@ pub mod context;
 pub mod error;
 pub mod extract;
 pub mod handler;
+pub mod middleware;
 pub mod response;
 pub mod router;
 pub mod server;
@@ -13,6 +14,7 @@ pub mod prelude {
     pub use crate::context::RequestContext;
     pub use crate::error::{Error, Result};
     pub use crate::extract::{Context, Json, Path};
+    pub use crate::middleware::{Middleware, Next};
     pub use crate::response::IntoResponse;
     pub use crate::router::Router;
 
