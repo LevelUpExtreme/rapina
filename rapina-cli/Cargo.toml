@@ -1,10 +1,12 @@
 [package]
 name = "rapina-cli"
-version = "0.1.0"
+version = "0.1.0-alpha.2"
 edition = "2024"
-description = "CLI tool for Rapina web framework"
+description = "CLI tool for Rapina web framework - create and run Rapina projects"
 license = "MIT"
 repository = "https://github.com/arferreira/rapina"
+documentation = "https://github.com/arferreira/rapina"
+readme = "../README.md"
 keywords = ["web", "framework", "cli", "rapina"]
 categories = ["command-line-utilities", "web-programming"]
 

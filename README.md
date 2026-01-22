@@ -1,4 +1,4 @@
-# Rapina 🦅
+# Rapina
 
 [![Crates.io](https://img.shields.io/crates/v/rapina.svg)](https://crates.io/crates/rapina)
 [![Documentation](https://docs.rs/rapina/badge.svg)](https://docs.rs/rapina)
@@ -15,7 +15,18 @@ Add Rapina to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rapina = "0.1"
+rapina = "0.1.0-alpha.2"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+```
+
+Or use the CLI to create a new project:
+
+```bash
+cargo install rapina-cli
+rapina new my-app
+cd my-app
+rapina dev
 ```
 
 ## Why Rapina?
@@ -30,55 +41,14 @@ rapina = "0.1"
 ```rust
 use rapina::prelude::*;
 
-#[derive(Deserialize)]
-struct CreateUser {
-    name: String,
-    email: String,
-}
-
-#[derive(Serialize)]
-struct User {
-    id: u64,
-    name: String,
-    email: String,
-}
-
-#[get("/")]
-async fn hello() -> &'static str {
-    "Hello, Rapina!"
-}
-
-#[get("/users/:id")]
-async fn get_user(id: Path<u64>) -> Result<Json<User>> {
-    let id = id.into_inner();
-
-    if id == 0 {
-        return Err(Error::not_found("user not found"));
-    }
-
-    Ok(Json(User {
-        id,
-        name: "Antonio".to_string(),
-        email: "antonio@rust.dev".to_string(),
-    }))
-}
-
-#[post("/users")]
-async fn create_user(body: Json<CreateUser>) -> Json<User> {
-    let input = body.into_inner();
-    Json(User {
-        id: 1,
-        name: input.name,
-        email: input.email,
-    })
-}
-
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let router = Router::new()
-        .get("/", hello)
-        .get("/users/:id", get_user)
-        .post("/users", create_user);
+        .get("/", |_, _, _| async { "Hello, Rapina!" })
+        .get("/users/:id", |_, params, _| async move {
+            let id = params.get("id").cloned().unwrap_or_default();
+            format!("User ID: {}", id)
+        });
 
     Rapina::new()
         .router(router)
@@ -89,20 +59,53 @@ async fn main() -> std::io::Result<()> {
 
 ## Features
 
+### CLI Tools
+
+Rapina comes with a powerful CLI for development:
+
+```bash
+# Install the CLI
+cargo install rapina-cli
+
+# Create a new project
+rapina new my-app
+
+# Start development server with hot reload
+rapina dev
+
+# Custom port and host
+rapina dev -p 8080 --host 0.0.0.0
+```
+
 ### Typed Extractors
 
 ```rust
-#[get("/users/:id")]
-async fn get_user(id: Path<u64>) -> Json<User> { ... }
+// Path parameters
+Router::new().get("/users/:id", |_, params, _| async move {
+    let id = params.get("id").cloned().unwrap_or_default();
+    format!("User: {}", id)
+});
 
-#[post("/users")]
-async fn create_user(body: Json<CreateUser>) -> Json<User> { ... }
+// JSON body
+Router::new().post("/users", |req, _, _| async move {
+    use http_body_util::BodyExt;
+    let body = req.into_body().collect().await.unwrap().to_bytes();
+    let user: User = serde_json::from_slice(&body).unwrap();
+    Json(user)
+});
 
-#[get("/search")]
-async fn search(query: Query<SearchParams>) -> Json<Results> { ... }
+// Query parameters
+Router::new().get("/search", |req, _, _| async move {
+    let query = req.uri().query().unwrap_or("");
+    let params: SearchParams = serde_urlencoded::from_str(query).unwrap();
+    Json(params)
+});
 
-#[post("/login")]
-async fn login(form: Form<LoginData>) -> Json<Token> { ... }
+// Application state
+Router::new().get("/config", |_, _, state| async move {
+    let config = state.get::<AppConfig>().unwrap();
+    format!("DB: {}", config.db_url)
+});
 ```
 
 Available extractors: `Json`, `Path`, `Query`, `Form`, `Headers`, `State`, `Context`
@@ -111,6 +114,7 @@ Available extractors: `Json`, `Path`, `Query`, `Form`, `Headers`, `State`, `Cont
 
 ```rust
 use rapina::middleware::{TimeoutMiddleware, BodyLimitMiddleware, TraceIdMiddleware};
+use std::time::Duration;
 
 Rapina::new()
     .middleware(TraceIdMiddleware::new())
@@ -135,13 +139,58 @@ Every error returns a consistent envelope with `trace_id`:
 }
 ```
 
-### Declarative Macros
+Built-in error constructors:
 
 ```rust
-#[get("/path")]
-#[post("/path")]
-#[put("/path")]
-#[delete("/path")]
+Error::bad_request("invalid input")      // 400
+Error::unauthorized("login required")    // 401
+Error::forbidden("access denied")        // 403
+Error::not_found("user not found")       // 404
+Error::conflict("already exists")        // 409
+Error::validation("invalid email")       // 422
+Error::rate_limited("too many requests") // 429
+Error::internal("something went wrong")  // 500
+```
+
+### Route Introspection
+
+Enable introspection to see all registered routes:
+
+```rust
+Rapina::new()
+    .with_introspection(true)  // Enabled by default in debug builds
+    .router(router)
+    .listen("127.0.0.1:3000")
+    .await
+```
+
+Access routes at `http://localhost:3000/.__rapina/routes`:
+
+```json
+[
+  {"method": "GET", "path": "/", "handler_name": "hello"},
+  {"method": "GET", "path": "/users/:id", "handler_name": "get_user"}
+]
+```
+
+### Testing
+
+Built-in test client for integration testing:
+
+```rust
+use rapina::testing::TestClient;
+
+#[tokio::test]
+async fn test_hello() {
+    let app = Rapina::new()
+        .router(Router::new().get("/", |_, _, _| async { "Hello!" }));
+
+    let client = TestClient::new(app).await;
+    let response = client.get("/").send().await;
+
+    assert_eq!(response.status(), 200);
+    assert_eq!(response.text(), "Hello!");
+}
 ```
 
 ### Application State
@@ -150,11 +199,6 @@ Every error returns a consistent envelope with `trace_id`:
 #[derive(Clone)]
 struct AppConfig {
     db_url: String,
-}
-
-#[get("/config")]
-async fn get_config(state: State<AppConfig>) -> String {
-    state.into_inner().db_url
 }
 
 Rapina::new()
@@ -166,18 +210,19 @@ Rapina::new()
 
 ## Roadmap
 
-- [x] Basic router
+- [x] Basic router with path parameters
 - [x] Extractors (`Json`, `Path`, `Query`, `Form`, `Headers`, `State`, `Context`)
-- [x] Proc macros (`#[get]`, `#[post]`, `#[put]`, `#[delete]`)
 - [x] Standardized error handling with `trace_id`
 - [x] Middleware system (`Timeout`, `BodyLimit`, `TraceId`)
 - [x] Dependency Injection / State
 - [x] Request context with tracing
+- [x] Route introspection endpoint
+- [x] Test client for integration testing
+- [x] CLI (`rapina new`, `rapina dev`)
+- [ ] Validation (`Validated<T>`)
 - [ ] Auth (Bearer JWT, `CurrentUser`)
 - [ ] Observability (tracing, structured logs)
-- [ ] Validation (`Validated<T>`)
 - [ ] Automatic OpenAPI
-- [ ] CLI (`rapina new`, `rapina routes`)
 
 ## Philosophy
 
