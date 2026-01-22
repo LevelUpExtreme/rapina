@@ -4,6 +4,7 @@ pub mod error;
 pub mod extract;
 pub mod handler;
 pub mod middleware;
+pub mod observability;
 pub mod response;
 pub mod router;
 pub mod server;
@@ -16,11 +17,13 @@ pub mod prelude {
     pub use crate::error::{Error, Result};
     pub use crate::extract::{Context, Form, Headers, Json, Path, Query, Validated};
     pub use crate::middleware::{Middleware, Next};
+    pub use crate::observability::TracingConfig;
     pub use crate::response::IntoResponse;
     pub use crate::router::Router;
 
     pub use http::{Method, StatusCode};
     pub use serde::{Deserialize, Serialize};
+    pub use tracing;
     pub use validator::Validate;
 
     pub use rapina_macros::{delete, get, post, put};

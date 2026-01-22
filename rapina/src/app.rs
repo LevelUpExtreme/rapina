@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 
 use crate::middleware::{Middleware, MiddlewareStack};
+use crate::observability::TracingConfig;
 use crate::router::Router;
 use crate::server::serve;
 use crate::state::AppState;
@@ -32,6 +33,11 @@ impl Rapina {
 
     pub fn middleware<M: Middleware>(mut self, middleware: M) -> Self {
         self.middlewares.add(middleware);
+        self
+    }
+
+    pub fn with_tracing(self, config: TracingConfig) -> Self {
+        config.init();
         self
     }
 

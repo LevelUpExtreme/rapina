@@ -29,6 +29,10 @@ serde_urlencoded = "0.7"
 # Validation
 validator = { version = "0.20.0", features = ["derive"] }
 
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+
 uuid = { version = "1", features = ["v4"] }
 
 # Our macros
