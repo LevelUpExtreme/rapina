@@ -2,6 +2,7 @@
 
 use std::net::SocketAddr;
 
+use crate::introspection::{RouteRegistry, list_routes};
 use crate::middleware::{Middleware, MiddlewareStack};
 use crate::observability::TracingConfig;
 use crate::router::Router;
@@ -33,15 +34,19 @@ pub struct Rapina {
     router: Router,
     state: AppState,
     middlewares: MiddlewareStack,
+    introspection: bool,
 }
 
 impl Rapina {
     /// Creates a new Rapina application builder.
+    ///
+    /// Introspection is enabled by default in debug builds.
     pub fn new() -> Self {
         Self {
             router: Router::new(),
             state: AppState::new(),
             middlewares: MiddlewareStack::new(),
+            introspection: cfg!(debug_assertions),
         }
     }
 
@@ -69,13 +74,36 @@ impl Rapina {
         self
     }
 
+    /// Enables or disables the introspection endpoint.
+    ///
+    /// When enabled, a `GET /.__rapina/routes` endpoint is registered
+    /// that returns all routes as JSON.
+    ///
+    /// Introspection is enabled by default in debug builds.
+    pub fn with_introspection(mut self, enabled: bool) -> Self {
+        self.introspection = enabled;
+        self
+    }
+
     /// Starts the HTTP server on the given address.
     ///
     /// # Panics
     ///
     /// Panics if the address cannot be parsed.
-    pub async fn listen(self, addr: &str) -> std::io::Result<()> {
+    pub async fn listen(mut self, addr: &str) -> std::io::Result<()> {
         let addr: SocketAddr = addr.parse().expect("invalid address");
+
+        if self.introspection {
+            // Store route metadata in state for the introspection endpoint
+            let routes = self.router.routes();
+            self.state = self.state.with(RouteRegistry::with_routes(routes));
+
+            // Register the introspection endpoint
+            self.router = self
+                .router
+                .get_named("/.__rapina/routes", "list_routes", list_routes);
+        }
+
         serve(self.router, self.state, self.middlewares, addr).await
     }
 }
@@ -198,5 +226,24 @@ mod tests {
 
         // MiddlewareStack doesn't expose count, but we can verify it's not empty
         assert!(!app.middlewares.is_empty());
+    }
+
+    #[test]
+    fn test_rapina_introspection_enabled_in_debug() {
+        let app = Rapina::new();
+        // In debug builds, introspection should be enabled
+        assert_eq!(app.introspection, cfg!(debug_assertions));
+    }
+
+    #[test]
+    fn test_rapina_with_introspection_enabled() {
+        let app = Rapina::new().with_introspection(true);
+        assert!(app.introspection);
+    }
+
+    #[test]
+    fn test_rapina_with_introspection_disabled() {
+        let app = Rapina::new().with_introspection(false);
+        assert!(!app.introspection);
     }
 }
