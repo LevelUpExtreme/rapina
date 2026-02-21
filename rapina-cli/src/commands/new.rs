@@ -64,21 +64,7 @@ pub fn execute(name: &str) -> Result<(), String> {
 }
 fn generate_readme(name: &str) -> String {
     format!(
-        r#"#{name}
-        #A web application built with Rapina.
-
-        ## Getting started
-        ```bash
-        rapina dev
-        ```
-
-        ## Routes
-
-        - `GET /` — Hello world
-        - `GET /health` — Health check
-
-
-        "#
+        "# {name}\n\nA web application built with Rapina.\n\n## Getting started\n\n```bash\nrapina dev\n```\n\n## Routes\n\n- `GET /` — Hello world\n- `GET /health` — Health check\n"
     )
 }
 
