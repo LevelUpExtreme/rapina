@@ -1379,6 +1379,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "inventory"
+version = "0.3.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "009ae045c87e7082cb72dab0ccd01ae075dd00141ddc108f43a0ea150a9e7227"
+dependencies = [
+ "rustversion",
+]
+
+[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2071,7 +2080,7 @@ dependencies = [
 
 [[package]]
 name = "rapina"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2082,6 +2091,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "inventory",
  "jsonwebtoken",
  "prometheus",
  "rapina-macros",
@@ -2100,7 +2110,7 @@ dependencies = [
 
 [[package]]
 name = "rapina-cli"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "chrono",
  "clap",
@@ -2115,7 +2125,7 @@ dependencies = [
 
 [[package]]
 name = "rapina-macros"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
